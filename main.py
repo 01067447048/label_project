@@ -4,6 +4,10 @@ import numpy as np
 
 file_type_png = 'png'
 file_type_jpg = 'jpg'
+type_jpeg = "jpeg"
+type_jpg = "jpg"
+type_png = "png"
+
 
 def labeling(img):
     blur = cv2.GaussianBlur(img, ksize=(3, 3), sigmaX=0)
@@ -51,19 +55,42 @@ def labeling(img):
     # cv2.waitKey(0)
 
     if x < 3:
-        return x, y-3, w+6, h+6
+        return x, y - 3, w + 6, h + 6
 
     if y < 3:
-        return x-3, y, w+6, h+6
+        return x - 3, y, w + 6, h + 6
 
-    return x-3, y-3, w+6, h+6
+    return x - 3, y - 3, w + 6, h + 6
     # background[y_offset:y_end, x_offset:x_end] = img_trim
     # return background
 
 
-for filename in glob.glob('./image/*.'+file_type_jpg):
+for filename in glob.glob('./images/*.' + type_jpg):
     img_o = cv2.imread(filename)
     img_g = cv2.imread(filename, cv2.IMREAD_GRAYSCALE)
+
+    size = img_o.shape[1]
+    size_2 = int(size / 3)
+
+    roi = img_o
+    roi_90 = cv2.rotate(roi, cv2.ROTATE_90_CLOCKWISE)
+    roi_180 = cv2.rotate(roi, cv2.ROTATE_180)
+    roi_270 = cv2.rotate(roi, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    roi[size_2:size, size_2 * 2:size] = roi_90[size_2:size, size_2 * 2:size]
+    roi[size_2:size, 0:size_2 * 2] = roi_180[size_2:size, 0:size_2 * 2]
+    roi[0:size_2 * 2, 0:size_2] = roi_270[0:size_2 * 2, 0:size_2]
+
+    if filename.find(type_jpeg):
+        cv2.imwrite(filename.replace('./images', './augmentationImages').replace(type_jpeg, type_jpg), roi)
+    elif filename.find(type_png):
+        cv2.imwrite(filename.replace('./images', './augmentationImages').replace(type_png, type_jpg), roi)
+    else:
+        cv2.imwrite(filename.replace('./images', './augmentationImages'), roi)
+
+for filename2 in glob.glob('./augmentationImages/*.' + file_type_jpg):
+    img_o = cv2.imread(filename2)
+    img_g = cv2.imread(filename2, cv2.IMREAD_GRAYSCALE)
 
     size = img_o.shape[1]
     size_2 = int(size / 3)
@@ -89,24 +116,26 @@ for filename in glob.glob('./image/*.'+file_type_jpg):
     }
 
     path = './image'
-    bar = filename.find('_')
-    name = filename.replace(file_type_jpg, "xml")
-    labeled = filename.replace('image', 'labeledImages').split('-')
-    builder = labeled[0] + '_3' + labeled[1] # ./labeledImaged/f21_01.png
+    bar = filename2.find('_')
+    name = filename2.replace(file_type_jpg, "xml")
+    labeled = filename2.replace('augmentationImages', 'labeledImages').split('_')
+    builder = labeled[0] + '_' + labeled[1]  # ./labeledImaged/f21_01.png
 
-    cv2.imwrite(builder.replace(file_type_png, file_type_jpg), img_o)
+    # cv2.imwrite(builder.replace(file_type_png, file_type_jpg), img_o)
 
     with open(builder.replace(file_type_jpg, 'xml').replace('labeledImages', 'xml'), 'w') as xml:
         xml.write('<annotation>\n\t<folder>라벨링</folder>\n\t'
-                  '<filename>'+builder.replace("./labeledImages/", "")+'</filename>\n\t'
-                                        '<size>\n\t\t<width>'+str(size)+'</width>\n\t\t<height>'+str(size)+'</height>\n\t\t'
-                                                                                                           '<depth>3</depth>\n\t</size>\n')
+                  '<filename>' + builder.replace("./labeledImages/", "") + '</filename>\n\t'
+                                                                           '<size>\n\t\t<width>' + str(
+            size) + '</width>\n\t\t<height>' + str(size) + '</height>\n\t\t'
+                                                           '<depth>3</depth>\n\t</size>\n')
         for key, value in image_dict.items():
 
             min_x, min_y, width, height = labeling(value)
 
             if key == 'fertile_0' or key == 'fertile_180':
                 min_x = min_x + size_2
+
             elif key == 'fertile_45' or key == 'fertile_90' or key == 'fertile_135':
                 min_x = min_x + size_2 * 2
 
@@ -115,11 +144,12 @@ for filename in glob.glob('./image/*.'+file_type_jpg):
             elif key == 'fertile_225' or key == 'fertile_180' or key == 'fertile_135':
                 min_y = min_y + size_2 * 2
 
-            xml.write('\t<object>\n\t\t<name>'+key+'</name>\n\t\t<difficult>0</difficult>\n\t\t<bndbox>\n\t\t\t'+
-                      '<xmin>' + str(min_x) +'</xmin>\n\t\t\t'
-                      '<ymin>' + str(min_y) + '</ymin>\n\t\t\t'
-                      '<xmax>' + str(min_x + width) + '</xmax>\n\t\t\t'
-                      '<ymax>' + str(min_y + height) + '</ymax>\n\t\t'
-                      '</bndbox>\n\t</object>\n')
+            xml.write('\t<object>\n\t\t<name>' + key + '</name>\n\t\t<difficult>0</difficult>\n\t\t<bndbox>\n\t\t\t' +
+                      '<xmin>' + str(min_x) + '</xmin>\n\t\t\t'
+                                              '<ymin>' + str(min_y) + '</ymin>\n\t\t\t'
+                                                                      '<xmax>' + str(min_x + width) + '</xmax>\n\t\t\t'
+                                                                                                      '<ymax>' + str(
+                min_y + height) + '</ymax>\n\t\t'
+                                  '</bndbox>\n\t</object>\n')
         xml.write('</annotation>')
         print(name)
